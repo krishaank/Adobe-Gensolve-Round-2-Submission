@@ -1,0 +1,154 @@
+#Reading and Visualizing Polylines
+import numpy as np
+import matplotlib.pyplot as plt
+
+def read_csv(csv_path):
+    np_path_XYs = np.genfromtxt(csv_path, delimiter=',')
+    path_XYs = []
+    for i in np.unique(np_path_XYs[:, 0]):
+        npXYs = np_path_XYs[np_path_XYs[:, 0] == i][:, 1:]
+        XYs = []
+        for j in np.unique(npXYs[:, 0]):
+            XY = npXYs[npXYs[:, 0] == j][:, 1:]
+            XYs.append(XY)
+        path_XYs.append(XYs)
+    return path_XYs
+
+def plot_paths(paths_XYs):
+    colours = ['r', 'g', 'b', 'c', 'm', 'y', 'k']
+    fig, ax = plt.subplots(tight_layout=True, figsize=(8, 8))
+    for i, XYs in enumerate(paths_XYs):
+        c = colours[i % len(colours)]
+        for XY in XYs:
+            ax.plot(XY[:, 0], XY[:, 1], c=c, linewidth=2)
+    ax.set_aspect('equal')
+    plt.show()
+#Regularizing Curves
+Detecting Straight Lines
+def detect_straight_lines(paths_XYs):
+    straight_lines = []
+    for path in paths_XYs:
+        for XY in path:
+            if np.all(np.diff(XY, axis=0)[:, 0] == 0) or np.all(np.diff(XY, axis=0)[:, 1] == 0):
+                straight_lines.append(XY)
+    return straight_lines
+Detecting Circles and Ellipses
+from sklearn.linear_model import LinearRegression
+
+def is_circle(XY):
+    # Check if points are equidistant from a center
+    center = np.mean(XY, axis=0)
+    distances = np.linalg.norm(XY - center, axis=1)
+    return np.allclose(distances, distances[0], rtol=1e-3)
+
+def detect_circles_ellipses(paths_XYs):
+    circles, ellipses = [], []
+    for path in paths_XYs:
+        for XY in path:
+            if is_circle(XY):
+                circles.append(XY)
+            else:
+                # Use a regression model to check for ellipse
+                model = LinearRegression()
+                X = XY[:, 0].reshape(-1, 1)
+                model.fit(X, XY[:, 1])
+                if np.allclose(XY[:, 1], model.predict(X), rtol=1e-3):
+                    ellipses.append(XY)
+    return circles, ellipses
+Detecting Rectangles and Rounded Rectangles
+def is_rectangle(XY):
+    diffs = np.diff(XY, axis=0)
+    angles = np.arctan2(diffs[:, 1], diffs[:, 0])
+    angle_diffs = np.diff(np.sort(np.unique(angles)))
+    return len(np.unique(angles)) == 2 and np.allclose(angle_diffs, np.pi/2, rtol=1e-3)
+
+def detect_rectangles(paths_XYs):
+    rectangles, rounded_rectangles = [], []
+    for path in paths_XYs:
+        for XY in path:
+            if is_rectangle(XY):
+                rectangles.append(XY)
+            else:
+                # Implement logic to detect rounded rectangles
+                pass
+    return rectangles, rounded_rectangles
+#Detecting Regular Polygons and Star Shapes
+def is_regular_polygon(XY):
+    distances = np.linalg.norm(np.diff(XY, axis=0), axis=1)
+    return np.allclose(distances, distances[0], rtol=1e-3)
+
+def detect_polygons(paths_XYs):
+    polygons = []
+    for path in paths_XYs:
+        for XY in path:
+            if is_regular_polygon(XY):
+                polygons.append(XY)
+    return polygons
+
+def detect_star_shapes(paths_XYs):
+    star_shapes = []
+    # Implement logic to detect star shapes
+    return star_shapes
+#Exploring Symmetry in Curves
+def detect_symmetry(XY):
+    center = np.mean(XY, axis=0)
+    return np.allclose(XY, 2*center - XY[::-1], rtol=1e-3)
+
+def fit_bezier_on_symmetric_points(XY):
+    # Implement Bezier curve fitting on symmetric points
+    pass
+#Completing Incomplete Curves
+def complete_incomplete_curves(paths_XYs):
+    completed_paths = []
+    # Implement curve completion logic
+    return completed_paths
+#Visualizing Output as SVG
+import svgwrite
+import cairosvg
+
+def polylines2svg(paths_XYs, svg_path):
+    W, H = 0, 0
+    for path_XYs in paths_XYs:
+        for XY in path_XYs:
+            W, H = max(W, np.max(XY[:, 0])), max(H, np.max(XY[:, 1]))
+    padding = 0.1
+    W, H = int(W + padding * W), int(H + padding * H)
+    dwg = svgwrite.Drawing(svg_path, profile='tiny', shape_rendering='crispEdges')
+    group = dwg.g()
+    colours = ['r', 'g', 'b', 'c', 'm', 'y', 'k']
+    for i, path in enumerate(paths_XYs):
+        path_data = []
+        c = colours[i % len(colours)]
+        for XY in path:
+            path_data.append(("M", (XY[0, 0], XY[0, 1])))
+            for j in range(1, len(XY)):
+                path_data.append(("L", (XY[j, 0], XY[j, 1])))
+            if not np.allclose(XY[0], XY[-1]):
+                path_data.append(("Z", None))
+        group.add(dwg.path(d=path_data, fill=c, stroke='none', stroke_width=2))
+    dwg.add(group)
+    dwg.save()
+    png_path = svg_path.replace('.svg', '.png')
+    fact = max(1, 1024 // min(H, W))
+    cairosvg.svg2png(url=svg_path, write_to=png_path, parent_width=W, parent_height=H, output_width=fact*W, output_height=fact*H, background_color='white')
+    return png_path
+#Usage
+#Reading and Visualizing CSV:
+path_XYs = read_csv('path/to/your/csv/file.csv')
+plot_paths(path_XYs)
+#Regularizing Curves:
+straight_lines = detect_straight_lines(path_XYs)
+circles, ellipses = detect_circles_ellipses(path_XYs)
+rectangles, rounded_rectangles = detect_rectangles(path_XYs)
+polygons = detect_polygons(path_XYs)
+star_shapes = detect_star_shapes(path_XYs)
+#Exploring Symmetry:
+for path in path_XYs:
+    for XY in path:
+        if detect_symmetry(XY):
+            fit_bezier_on_symmetric_points(XY)
+#Completing Incomplete Curves:
+completed_paths = complete_incomplete_curves(path_XYs)
+#Visualizing Output:
+polylines2svg(completed_paths, 'output.svg')
+
